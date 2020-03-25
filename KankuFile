@@ -1,0 +1,57 @@
+#
+domain_name: mirrorbrain
+default_job: kanku-job
+login_user: root
+login_pass: kankudai
+
+jobs:
+ kanku-job:
+  -
+    use_module: Kanku::Handler::SetJobContext
+    options:
+      host_interface: eth0
+  -
+    use_module: Kanku::Handler::OBSCheck
+    options:
+      api_url: https://api.opensuse.org/public
+      # Please have a look at
+      # kanku lsi
+      # to find more official Images
+      project: devel:kanku:images
+      package: openSUSE-Leap-15.1-JeOS
+      repository: images_leap_15_1
+      use_oscrc: 0
+  -
+    use_module: Kanku::Handler::ImageDownload
+  -
+    use_module: Kanku::Handler::CreateDomain
+    options:
+      memory: 2G
+      vcpu: 2
+      use_9p: 1
+      #forward_port_list: tcp:22,tcp:443
+  -
+    use_module: Kanku::Handler::PrepareSSH
+  -
+    use_module: Kanku::Handler::ExecuteCommandViaSSH
+    options:
+      commands:
+        - zypper -n addrepo http://download.opensuse.org/repositories/openSUSE:/infrastructure/openSUSE_Leap_15.1/ openSUSE:infrastructure
+        - zypper mr -p 97 openSUSE:infrastructure
+        - zypper -n addrepo http://download.opensuse.org/repositories/server:/database:/postgresql/openSUSE_Leap_15.1/ server:database:postgresql
+        - zypper mr -p 98 server:database:postgresql
+        - zypper -n --gpg-auto-import-keys --no-gpg-checks refresh
+        - zypper -n install curl hostname iputils vim command-not-found bsdtar zip sudo wget
+        - zypper -n install python2-cmdln gzip patch
+        - zypper -n install postgresql10-ip4r postgresql10 postgresql10-server
+        - zypper -n install mirrorbrain mirrorbrain-scanner apache2-worker apache2-mod_asn apache2-mod_geoip apache2-mod_form mirrorbrain-tools
+        - zypper -n install gcc python-devel
+        - zypper -n install apache2-devel
+        - systemctl enable --now postgresql
+        - mkdir /srv/mytree
+        #- rsync .... /srv/mytree
+        - cp /tmp/kanku/kanku/etc/mirrorbrain.conf /etc/
+        - chmod 0640 /etc/mirrorbrain.conf
+        - chown root:mirrorbrain /etc/mirrorbrain.conf
+        - cp /tmp/kanku/kanku/pg_hba.conf /var/lib/pgsql/data/pg_hba.conf
+        - su -c "psql < /tmp/kanku/kanku/setupdb.sql" postgres
